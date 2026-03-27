@@ -573,6 +573,7 @@ export class QuietRunLogger implements Disposable {
       case 'script-not-wireit':
       case 'spawn-error':
       case 'unknown-error-thrown':
+      case 'unresolved-literal-files-entry':
       case 'wireit-config-but-no-script':
         // The default log for these is good.
         this.#simpleLogger.log(failure);

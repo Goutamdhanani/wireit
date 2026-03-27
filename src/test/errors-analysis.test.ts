@@ -2242,7 +2242,7 @@ void test(
         },
         wireit: {
           a: {
-            files: ['foo'],
+            files: ['*.foo'],
             env: {
               FOO: 'foo',
             },

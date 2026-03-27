@@ -217,6 +217,12 @@ export class SimpleLogger implements Logger {
             }
             break;
           }
+          case 'unresolved-literal-files-entry': {
+            this.console.error(
+              this.#diagnosticPrinter.print(event.diagnostic),
+            );
+            break;
+          }
           case 'aborted':
           case 'dependency-service-exited-unexpectedly': {
             // These event isn't very useful to log, because they are downstream
