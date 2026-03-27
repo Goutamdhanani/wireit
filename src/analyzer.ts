@@ -1019,8 +1019,13 @@ export class Analyzer {
         continue;
       }
       // Check if the pattern resolves to any file or directory.
-      // includeDirectories: true ensures a bare directory name (e.g. "src")
-      // is a valid match and does not trigger this warning.
+      // Note: includeDirectories: true + expandDirectories: false intentionally
+      // differs from fingerprint.ts (which uses includeDirectories: false +
+      // expandDirectories: true). Here we only need to know if the pattern
+      // resolves to *something* (file or directory) — we do not need to
+      // enumerate every file within a directory. fingerprint.ts must expand
+      // directories to hash their contents, but that deeper traversal is
+      // unnecessary for this existence check.
       const matches = await glob([pattern], {
         cwd: placeholder.packageDir,
         followSymlinks: true,
