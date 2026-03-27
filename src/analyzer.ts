@@ -8,6 +8,7 @@ import * as pathlib from 'path';
 import {Dependency, scriptReferenceToString, ServiceConfig} from './config.js';
 import {findNodeAtLocation, JsonFile} from './util/ast.js';
 import * as fs from './util/fs.js';
+import {glob} from './util/glob.js';
 import {
   CachingPackageJsonReader,
   FileSystem,
@@ -584,6 +585,14 @@ export class Analyzer {
       allowUsuallyExcludedPaths,
     );
 
+    if (files !== undefined) {
+      await this.#warnOnUnresolvedLiteralFilesEntries(
+        placeholder,
+        packageJson,
+        files,
+      );
+    }
+
     if (
       dependencies.length === 0 &&
       !dependenciesErrored &&
@@ -979,6 +988,73 @@ export class Analyzer {
       values.push(...DEFAULT_EXCLUDE_PATHS);
     }
     return {node: filesNode, values};
+  }
+
+  /**
+   * For each entry in the "files" array that looks like a literal path (i.e.
+   * contains no glob syntax), emit a warning diagnostic if the path does not
+   * match any file or directory on disk.
+   */
+  async #warnOnUnresolvedLiteralFilesEntries(
+    placeholder: UnvalidatedConfig,
+    packageJson: PackageJson,
+    files: ArrayNode<string>,
+  ): Promise<void> {
+    const children = files.node.children ?? [];
+    for (const child of children) {
+      if (typeof child.value !== 'string') {
+        continue;
+      }
+      const pattern = child.value;
+      // Empty/blank strings are invalid and caught separately by validation.
+      if (pattern.trim() === '') {
+        continue;
+      }
+      // Exclusion patterns are never required to match anything.
+      if (pattern.startsWith('!')) {
+        continue;
+      }
+      // Patterns with glob syntax are not required to match anything.
+      if (!isProbablyLiteral(pattern)) {
+        continue;
+      }
+      // Check if the pattern resolves to any file or directory.
+      // Note: includeDirectories: true + expandDirectories: false intentionally
+      // differs from fingerprint.ts (which uses includeDirectories: false +
+      // expandDirectories: true). Here we only need to know if the pattern
+      // resolves to *something* (file or directory) — we do not need to
+      // enumerate every file within a directory. fingerprint.ts must expand
+      // directories to hash their contents, but that deeper traversal is
+      // unnecessary for this existence check.
+      const matches = await glob([pattern], {
+        cwd: placeholder.packageDir,
+        followSymlinks: true,
+        includeDirectories: true,
+        expandDirectories: false,
+        throwIfOutsideCwd: false,
+      });
+      if (matches.length > 0) {
+        continue;
+      }
+      placeholder.failures.push({
+        type: 'failure',
+        reason: 'unresolved-literal-files-entry',
+        script: placeholder,
+        diagnostic: {
+          severity: 'warning',
+          message:
+            `The "files" entry "${pattern}" did not match any files. ` +
+            `If this path is intentional, verify that it is correct relative to this package.`,
+          location: {
+            file: packageJson.jsonFile,
+            range: {
+              offset: child.offset,
+              length: child.length,
+            },
+          },
+        },
+      });
+    }
   }
 
   #processOutput(
@@ -1813,6 +1889,19 @@ export class Analyzer {
       value: {packageDir: absolutePackageDir, name: scriptName},
     };
   }
+}
+
+/**
+ * Returns true if the given glob pattern contains no glob special characters
+ * (i.e. it is a literal path that must match exactly one file or directory).
+ *
+ * Note: this does not account for backslash-escaped glob characters (e.g.
+ * `file\*.txt`), which are treated as literals by some glob implementations.
+ * Such patterns are rare in practice and will not trigger a false warning
+ * because the underlying glob call will simply return no matches.
+ */
+function isProbablyLiteral(pattern: string): boolean {
+  return !/[*?[\]{}]/.test(pattern);
 }
 
 /**

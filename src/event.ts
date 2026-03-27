@@ -103,7 +103,8 @@ export type Failure =
   | DependencyServiceExitedUnexpectedly
   | Aborted
   | InputFileDeletedUnexpectedly
-  | OutputFileDeletedUnexpectedly;
+  | OutputFileDeletedUnexpectedly
+  | UnresolvedLiteralFilesEntry;
 
 interface ErrorBase<
   T extends PackageReference = ScriptReference,
@@ -303,6 +304,14 @@ export interface InputFileDeletedUnexpectedly extends ErrorBase {
 export interface OutputFileDeletedUnexpectedly extends ErrorBase {
   reason: 'output-file-deleted-unexpectedly';
   filePaths: string[];
+}
+
+/**
+ * A literal path in the "files" array did not match any file on disk.
+ */
+export interface UnresolvedLiteralFilesEntry extends ErrorBase {
+  reason: 'unresolved-literal-files-entry';
+  diagnostic: Diagnostic;
 }
 
 /**

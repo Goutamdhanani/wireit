@@ -247,3 +247,195 @@ void test(
     assert.deepEqual(build.output?.values, []);
   }),
 );
+
+void test(
+  'warns when a literal files entry does not match any file',
+  rigTest(async ({rig}) => {
+    await rig.write({
+      'package.json': {
+        scripts: {
+          build: 'wireit',
+        },
+        wireit: {
+          build: {
+            command: 'true',
+            files: ['missing-file.js'],
+            packageLocks: [],
+          },
+        },
+      },
+    });
+
+    const analyzer = new Analyzer('npm');
+    const result = await analyzer.analyze(
+      {packageDir: rig.temp, name: 'build'},
+      [],
+    );
+    assert.equal(result.config.ok, false);
+    if (result.config.ok) {
+      throw new Error('Expected failures but got ok');
+    }
+    const failures = result.config.error;
+    assert.equal(failures.length, 1);
+    const failure = failures[0]!;
+    assert.equal(failure.reason, 'unresolved-literal-files-entry');
+    assert.equal(failure.type, 'failure');
+    if (failure.reason !== 'unresolved-literal-files-entry') {
+      throw new Error('unexpected reason');
+    }
+    assert.equal(failure.diagnostic.severity, 'warning');
+    assert.ok(failure.diagnostic.message.includes('missing-file.js'));
+  }),
+);
+
+void test(
+  'no warning when a literal files entry matches an existing file',
+  rigTest(async ({rig}) => {
+    await rig.write({
+      'package.json': {
+        scripts: {
+          build: 'wireit',
+        },
+        wireit: {
+          build: {
+            command: 'true',
+            files: ['real-file.js'],
+            packageLocks: [],
+          },
+        },
+      },
+    });
+    await rig.touch('real-file.js');
+
+    const analyzer = new Analyzer('npm');
+    const result = await analyzer.analyze(
+      {packageDir: rig.temp, name: 'build'},
+      [],
+    );
+    if (!result.config.ok) {
+      console.log(result.config.error);
+      throw new Error('Expected no failures but got: ' + JSON.stringify(result.config.error));
+    }
+  }),
+);
+
+void test(
+  'no warning when a glob pattern in files matches no files',
+  rigTest(async ({rig}) => {
+    await rig.write({
+      'package.json': {
+        scripts: {
+          build: 'wireit',
+        },
+        wireit: {
+          build: {
+            command: 'true',
+            files: ['src/**/*.ts'],
+            packageLocks: [],
+          },
+        },
+      },
+    });
+
+    const analyzer = new Analyzer('npm');
+    const result = await analyzer.analyze(
+      {packageDir: rig.temp, name: 'build'},
+      [],
+    );
+    if (!result.config.ok) {
+      console.log(result.config.error);
+      throw new Error('Expected no failures but got: ' + JSON.stringify(result.config.error));
+    }
+  }),
+);
+
+void test(
+  'no warning when a brace expansion pattern in files matches no files',
+  rigTest(async ({rig}) => {
+    await rig.write({
+      'package.json': {
+        scripts: {
+          build: 'wireit',
+        },
+        wireit: {
+          build: {
+            command: 'true',
+            files: ['src/{a,b}.ts'],
+            packageLocks: [],
+          },
+        },
+      },
+    });
+
+    const analyzer = new Analyzer('npm');
+    const result = await analyzer.analyze(
+      {packageDir: rig.temp, name: 'build'},
+      [],
+    );
+    if (!result.config.ok) {
+      console.log(result.config.error);
+      throw new Error('Expected no failures but got: ' + JSON.stringify(result.config.error));
+    }
+  }),
+);
+
+void test(
+  'no warning when a character class pattern in files matches no files',
+  rigTest(async ({rig}) => {
+    await rig.write({
+      'package.json': {
+        scripts: {
+          build: 'wireit',
+        },
+        wireit: {
+          build: {
+            command: 'true',
+            files: ['src/[abc].ts'],
+            packageLocks: [],
+          },
+        },
+      },
+    });
+
+    const analyzer = new Analyzer('npm');
+    const result = await analyzer.analyze(
+      {packageDir: rig.temp, name: 'build'},
+      [],
+    );
+    if (!result.config.ok) {
+      console.log(result.config.error);
+      throw new Error('Expected no failures but got: ' + JSON.stringify(result.config.error));
+    }
+  }),
+);
+
+void test(
+  'no warning when a literal files entry resolves to a directory',
+  rigTest(async ({rig}) => {
+    await rig.write({
+      'package.json': {
+        scripts: {
+          build: 'wireit',
+        },
+        wireit: {
+          build: {
+            command: 'true',
+            files: ['src'],
+            packageLocks: [],
+          },
+        },
+      },
+    });
+    await rig.mkdir('src');
+
+    const analyzer = new Analyzer('npm');
+    const result = await analyzer.analyze(
+      {packageDir: rig.temp, name: 'build'},
+      [],
+    );
+    if (!result.config.ok) {
+      console.log(result.config.error);
+      throw new Error('Expected no failures but got: ' + JSON.stringify(result.config.error));
+    }
+  }),
+);
