@@ -2242,7 +2242,7 @@ void test(
         },
         wireit: {
           a: {
-            files: ['*.foo'],
+            files: ['foo'],
             env: {
               FOO: 'foo',
             },
@@ -2250,6 +2250,9 @@ void test(
         },
       },
     });
+    // Create the file referenced in "files" so the literal-path check does not
+    // emit an unrelated warning that would interfere with this test's assertion.
+    await rig.touch('foo');
     const result = rig.exec('npm run a');
     const done = await result.exit;
     assert.equal(done.code, 1);

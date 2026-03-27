@@ -1019,6 +1019,8 @@ export class Analyzer {
         continue;
       }
       // Check if the pattern resolves to any file or directory.
+      // includeDirectories: true ensures a bare directory name (e.g. "src")
+      // is a valid match and does not trigger this warning.
       const matches = await glob([pattern], {
         cwd: placeholder.packageDir,
         followSymlinks: true,
@@ -1028,17 +1030,6 @@ export class Analyzer {
       });
       if (matches.length > 0) {
         continue;
-      }
-      // As an extra safety net, also check via stat in case the glob
-      // implementation does not surface directories under certain edge cases.
-      const resolvedPath = pathlib.resolve(placeholder.packageDir, pattern);
-      try {
-        const statResult = await fs.stat(resolvedPath);
-        if (statResult.isDirectory()) {
-          continue;
-        }
-      } catch {
-        // File/directory does not exist; fall through to emit warning.
       }
       placeholder.failures.push({
         type: 'failure',
